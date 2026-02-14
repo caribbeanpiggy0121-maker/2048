@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Photo 2048</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont;
+    background: #faf8ef;
+    text-align: center;
+  }
+  h1 { margin: 16px; }
+  input { margin: 10px; }
+  .board {
+    width: 320px;
+    height: 320px;
+    margin: 20px auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    background: #bbada0;
+    padding: 6px;
+    border-radius: 10px;
+  }
+  .cell {
+    background: #cdc1b4;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+</style>
+</head>
+<body>
+
+<h1>📸 Photo 2048</h1>
+<input type="file" multiple accept="image/*" id="upload" />
+<div class="board" id="board"></div>
+
+<script>
+const board = document.getElementById("board");
+let images = [];
+let grid = Array(16).fill(null);
+
+function render() {
+  board.innerHTML = "";
+  grid.forEach(img => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    if (img) {
+      const image = document.createElement("img");
+      image.src = img;
+      cell.appendChild(image);
+    }
+    board.appendChild(cell);
+  });
+}
+
+function randomEmpty() {
+  const empty = grid
+    .map((v, i) => v === null ? i : null)
+    .filter(v => v !== null);
+  return empty[Math.floor(Math.random() * empty.length)];
+}
+
+function addTile() {
+  if (images.length === 0) return;
+  const idx = randomEmpty();
+  if (idx !== undefined) {
+    grid[idx] = images[Math.floor(Math.random() * images.length)];
+  }
+}
+
+document.getElementById("upload").addEventListener("change", e => {
+  images = [];
+  [...e.target.files].forEach(file => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      images.push(ev.target.result);
+      if (images.length <= 2) addTile();
+      render();
+    };
+    reader.readAsDataURL(file);
+  });
+});
+
+let startX, startY;
+document.addEventListener("touchstart", e => {
+  startX = e.touches[0].clientX;
+  startY = e.touches[0].clientY;
+});
+document.addEventListener("touchend", e => {
+  const dx = e.changedTouches[0].clientX - startX;
+  const dy = e.changedTouches[0].clientY - startY;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (dx > 30) moveRight();
+    else if (dx < -30) moveLeft();
+  } else {
+    if (dy > 30) moveDown();
+    else if (dy < -30) moveUp();
+  }
+});
+
+function moveLeft() {
+  for (let r = 0; r < 4; r++) {
+    let row = grid.slice(r * 4, r * 4 + 4).filter(v => v);
+    while (row.length < 4) row.push(null);
+    grid.splice(r * 4, 4, ...row);
+  }
+  addTile(); render();
+}
+function moveRight() {
+  for (let r = 0; r < 4; r++) {
+    let row = grid.slice(r * 4, r * 4 + 4).filter(v => v);
+    while (row.length < 4) row.unshift(null);
+    grid.splice(r * 4, 4, ...row);
+  }
+  addTile(); render();
+}
+function moveUp() {
+  for (let c = 0; c < 4; c++) {
+    let col = [];
+    for (let r = 0; r < 4; r++) col.push(grid[r * 4 + c]);
+    col = col.filter(v => v);
+    while (col.length < 4) col.push(null);
+    for (let r = 0; r < 4; r++) grid[r * 4 + c] = col[r];
+  }
+  addTile(); render();
+}
+function moveDown() {
+  for (let c = 0; c < 4; c++) {
+    let col = [];
+    for (let r = 0; r < 4; r++) col.push(grid[r * 4 + c]);
+    col = col.filter(v => v);
+    while (col.length < 4) col.unshift(null);
+    for (let r = 0; r < 4; r++) grid[r * 4 + c] = col[r];
+  }
+  addTile(); render();
+}
+
+render();
+</script>
+</body>
+</html>
