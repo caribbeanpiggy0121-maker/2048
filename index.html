@@ -4,28 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Photo 2048</title>
-
 <style>
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont;
   background: #faf8ef;
   text-align: center;
+  user-select: none;
 }
-
 .screen {
   display: none;
   padding: 20px;
 }
-
 .active {
   display: block;
 }
-
 h1 {
   margin-top: 20px;
+  color: #776e65;
 }
-
 button {
   padding: 12px 20px;
   margin: 10px;
@@ -34,34 +31,34 @@ button {
   border: none;
   background: #8f7a66;
   color: white;
+  cursor: pointer;
 }
-
 .board {
   width: 320px;
   height: 320px;
   margin: 20px auto;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
   gap: 6px;
   background: #bbada0;
   padding: 6px;
   border-radius: 10px;
 }
-
 .cell {
   background: #cdc1b4;
   border-radius: 6px;
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-
 .cell img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  will-change: transform;
 }
-
 .num {
   position: absolute;
   bottom: 4px;
@@ -69,23 +66,27 @@ button {
   font-size: 14px;
   color: white;
   text-shadow: 0 1px 4px rgba(0,0,0,.6);
+  font-weight: bold;
 }
-
 .score {
   display: flex;
   justify-content: space-around;
   margin-top: 10px;
+  font-size: 18px;
+  color: #776e65;
+}
+#upload {
+  margin-top: 10px;
 }
 </style>
 </head>
-
 <body>
 
 <!-- 首页 -->
 <div id="home" class="screen active">
   <h1>📸 Photo 2048</h1>
-  <button onclick="startDemo()">Demo Mode</button>
-  <button onclick="startCustom()">Custom Mode</button>
+  <button onclick="startDemo()">Demo 模式</button>
+  <button onclick="startCustom()">自定义图片</button>
 </div>
 
 <!-- 游戏 -->
@@ -103,7 +104,10 @@ const board = document.getElementById("board");
 const scoreEl = document.getElementById("score");
 const bestEl = document.getElementById("best");
 
-let grid, imagesByLevel = {}, score = 0;
+let grid = [];
+let imagesByLevel = {};
+let score = 0;
+
 bestEl.textContent = localStorage.getItem("best") || 0;
 
 function show(id) {
@@ -111,6 +115,7 @@ function show(id) {
   document.getElementById(id).classList.add("active");
 }
 
+// 演示模式
 function startDemo() {
   imagesByLevel = {};
   for (let i = 1; i <= 12; i++) {
@@ -119,109 +124,204 @@ function startDemo() {
   startGame();
 }
 
+// 自定义图片模式
 function startCustom() {
   show("game");
 }
 
+// 上传图片处理
 document.getElementById("upload").addEventListener("change", async e => {
   const files = [...e.target.files];
   imagesByLevel = {};
-  let lvl = 1;
+  let level = 1;
   for (const file of files) {
-    imagesByLevel[lvl++] = await compress(file);
+    if (level > 12) break;
+    imagesByLevel[level] = await compressImage(file);
+    level++;
   }
   startGame();
 });
 
-function startGame() {
-  show("game");
-  grid = Array(16).fill(null);
-  score = 0;
-  addTile(); addTile();
-  render();
-}
-
-function compress(file) {
-  return new Promise(r => {
+// 压缩图片
+function compressImage(file) {
+  return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
-      const c = document.createElement("canvas");
-      c.width = c.height = 128;
-      c.getContext("2d").drawImage(img,0,0,128,128);
-      r(c.toDataURL("image/jpeg",0.7));
+      const canvas = document.createElement("canvas");
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, 128, 128);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
     };
     img.src = URL.createObjectURL(file);
   });
 }
 
-function addTile() {
-  const empty = grid.map((v,i)=>v?null:i).filter(v=>v!==null);
-  if (!empty.length) return;
-  const i = empty[Math.floor(Math.random()*empty.length)];
-  grid[i] = { level:1, img: imagesByLevel[1] };
-}
-
-function slide(arr) {
-  arr = arr.filter(Boolean);
-  for (let i=0;i<arr.length-1;i++) {
-    if (arr[i].level === arr[i+1].level) {
-      arr[i].level++;
-      arr[i].img = imagesByLevel[arr[i].level] || arr[i].img;
-      score += 2 ** arr[i].level;
-      arr[i+1] = null;
-    }
-  }
-  return arr.filter(Boolean);
-}
-
-function move(dir) {
-  let moved = false;
-  const g = [...grid];
-  const idx = i => dir==="L"?i:dir==="R"?3-i:dir==="U"?i*4:12-i*4;
-  for (let r=0;r<4;r++) {
-    let row=[];
-    for (let c=0;c<4;c++) row.push(g[idx(r*4+c)]);
-    let s = slide(row);
-    while (s.length<4) s.push(null);
-    for (let c=0;c<4;c++) {
-      if (grid[idx(r*4+c)]!==s[c]) moved=true;
-      grid[idx(r*4+c)] = s[c];
-    }
-  }
-  if (moved) addTile();
+// 开始游戏
+function startGame() {
+  show("game");
+  grid = Array(16).fill(null);
+  score = 0;
+  addTile();
+  addTile();
   render();
 }
 
-function render() {
-  board.innerHTML="";
-  scoreEl.textContent=score;
-  bestEl.textContent=Math.max(bestEl.textContent,score);
-  localStorage.setItem("best",bestEl.textContent);
-  grid.forEach(c=>{
-    const d=document.createElement("div");
-    d.className="cell";
-    if(c){
-      d.innerHTML=`<img src="${c.img}"><div class="num">${2**c.level}</div>`;
+// 随机生成方块
+function addTile() {
+  const emptyIndices = grid.map((v, i) => v === null ? i : null).filter(i => i !== null);
+  if (emptyIndices.length === 0) return;
+  const randIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
+  grid[randIndex] = {
+    level: 1,
+    img: imagesByLevel[1]
+  };
+}
+
+// 滑动合并核心
+function slideLine(cells) {
+  let arr = cells.filter(x => x !== null);
+  let merged = [];
+  let i = 0;
+  while (i < arr.length) {
+    if (i + 1 < arr.length && arr[i].level === arr[i + 1].level) {
+      const newLevel = arr[i].level + 1;
+      merged.push({
+        level: newLevel,
+        img: imagesByLevel[newLevel] || arr[i].img
+      });
+      score += Math.pow(2, newLevel);
+      i += 2;
+    } else {
+      merged.push(arr[i]);
+      i++;
     }
-    board.appendChild(d);
+  }
+  while (merged.length < 4) {
+    merged.push(null);
+  }
+  return merged;
+}
+
+// 四个方向移动
+function moveLeft() {
+  let moved = false;
+  for (let row = 0; row < 4; row++) {
+    const start = row * 4;
+    const line = grid.slice(start, start + 4);
+    const newLine = slideLine(line);
+    for (let i = 0; i < 4; i++) {
+      if (grid[start + i] !== newLine[i]) moved = true;
+      grid[start + i] = newLine[i];
+    }
+  }
+  return moved;
+}
+function moveRight() {
+  let moved = false;
+  for (let row = 0; row < 4; row++) {
+    const start = row * 4;
+    const line = grid.slice(start, start + 4).reverse();
+    const newLine = slideLine(line).reverse();
+    for (let i = 0; i < 4; i++) {
+      if (grid[start + i] !== newLine[i]) moved = true;
+      grid[start + i] = newLine[i];
+    }
+  }
+  return moved;
+}
+function moveUp() {
+  let moved = false;
+  for (let col = 0; col < 4; col++) {
+    const line = [grid[col], grid[col+4], grid[col+8], grid[col+12]];
+    const newLine = slideLine(line);
+    for (let i = 0; i < 4; i++) {
+      const idx = col + i*4;
+      if (grid[idx] !== newLine[i]) moved = true;
+      grid[idx] = newLine[i];
+    }
+  }
+  return moved;
+}
+function moveDown() {
+  let moved = false;
+  for (let col = 0; col < 4; col++) {
+    const line = [grid[col], grid[col+4], grid[col+8], grid[col+12]].reverse();
+    const newLine = slideLine(line).reverse();
+    for (let i = 0; i < 4; i++) {
+      const idx = col + i*4;
+      if (grid[idx] !== newLine[i]) moved = true;
+      grid[idx] = newLine[i];
+    }
+  }
+  return moved;
+}
+
+// 渲染界面
+function render() {
+  board.innerHTML = "";
+  scoreEl.textContent = score;
+  const best = Math.max(bestEl.textContent, score);
+  bestEl.textContent = best;
+  localStorage.setItem("best", best);
+
+  grid.forEach(cell => {
+    const div = document.createElement("div");
+    div.className = "cell";
+    if (cell) {
+      div.innerHTML = `
+        < img src="${cell.img}">
+        <div class="num">${Math.pow(2, cell.level)}</div>
+      `;
+    }
+    board.appendChild(div);
   });
 }
 
-let sx,sy;
-document.addEventListener("touchstart",e=>{sx=e.touches[0].x;sy=e.touches[0].y});
-document.addEventListener("touchend",e=>{
-  let dx=e.changedTouches[0].x-sx,dy=e.changedTouches[0].y-sy;
-  if(Math.abs(dx)>Math.abs(dy)) dx>30?move("R"):dx<-30&&move("L");
-  else dy>30?move("D"):dy<-30&&move("U");
+// 手机触屏滑动
+let touchStartX = 0;
+let touchStartY = 0;
+
+document.addEventListener("touchstart", e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
 });
 
-function demoColor(l){
-  const c=document.createElement("canvas");
-  c.width=c.height=128;
-  const x=c.getContext("2d");
-  x.fillStyle=`hsl(${l*25},60%,60%)`;
-  x.fillRect(0,0,128,128);
-  return c.toDataURL();
+document.addEventListener("touchend", e => {
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const threshold = 30;
+
+  let moved = false;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (dx > threshold) {
+      moved = moveRight();
+    } else if (dx < -threshold) {
+      moved = moveLeft();
+    }
+  } else {
+    if (dy > threshold) {
+      moved = moveDown();
+    } else if (dy < -threshold) {
+      moved = moveUp();
+    }
+  }
+  if (moved) {
+    addTile();
+    render();
+  }
+});
+
+// 演示用纯色图
+function demoColor(level) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = `hsl(${level * 25}, 70%, 60%)`;
+  ctx.fillRect(0, 0, 128, 128);
+  return canvas.toDataURL();
 }
 </script>
 </body>
