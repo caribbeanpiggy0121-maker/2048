@@ -1,47 +1,46 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Photo 2048</title>
 <style>
-  body {
-    font-family: -apple-system, BlinkMacSystemFont;
-    background: #faf8ef;
-    text-align: center;
-  }
-  h1 { margin: 16px; }
-  input { margin: 10px; }
-  .board {
-    width: 320px;
-    height: 320px;
-    margin: 20px auto;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    background: #bbada0;
-    padding: 6px;
-    border-radius: 10px;
-  }
-  .cell {
-    background: #cdc1b4;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-  .cell img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+body {
+  font-family: -apple-system, BlinkMacSystemFont;
+  background: #faf8ef;
+  text-align: center;
+}
+h1 { margin: 16px; }
+
+.board {
+  width: 320px;
+  height: 320px;
+  margin: 20px auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  background: #bbada0;
+  padding: 6px;
+  border-radius: 10px;
+}
+.cell {
+  background: #cdc1b4;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+input { margin: 10px; }
 </style>
 </head>
 <body>
 
 <h1>📸 Photo 2048</h1>
-<input type="file" multiple accept="image/*" id="upload" />
+<input type="file" id="upload" multiple accept="image/*">
+
 <div class="board" id="board"></div>
 
 <script>
@@ -51,45 +50,95 @@ let grid = Array(16).fill(null);
 
 function render() {
   board.innerHTML = "";
-  grid.forEach(img => {
-    const cell = document.createElement("div");
-    cell.className = "cell";
-    if (img) {
-      const image = document.createElement("img");
-      image.src = img;
-      cell.appendChild(image);
+  grid.forEach(cell => {
+    const div = document.createElement("div");
+    div.className = "cell";
+    if (cell) {
+      const img = document.createElement("img");
+      img.src = cell.img;
+      div.appendChild(img);
     }
-    board.appendChild(cell);
+    board.appendChild(div);
   });
 }
 
 function randomEmpty() {
-  const empty = grid
+  return grid
     .map((v, i) => v === null ? i : null)
-    .filter(v => v !== null);
-  return empty[Math.floor(Math.random() * empty.length)];
+    .filter(v => v !== null)
+    .sort(() => Math.random() - 0.5)[0];
 }
 
 function addTile() {
   if (images.length === 0) return;
   const idx = randomEmpty();
   if (idx !== undefined) {
-    grid[idx] = images[Math.floor(Math.random() * images.length)];
+    grid[idx] = {
+      level: 1,
+      img: images[0]
+    };
   }
 }
 
-document.getElementById("upload").addEventListener("change", e => {
-  images = [];
-  [...e.target.files].forEach(file => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      images.push(ev.target.result);
-      if (images.length <= 2) addTile();
-      render();
-    };
-    reader.readAsDataURL(file);
-  });
-});
+function slide(row) {
+  row = row.filter(v => v);
+  for (let i = 0; i < row.length - 1; i++) {
+    if (row[i].level === row[i + 1].level) {
+      row[i].level++;
+      row[i].img = images[row[i].level - 1] || row[i].img;
+      row[i + 1] = null;
+    }
+  }
+  row = row.filter(v => v);
+  while (row.length < 4) row.push(null);
+  return row;
+}
+
+function moveLeft() {
+  let moved = false;
+  for (let r = 0; r < 4; r++) {
+    const old = grid.slice(r*4, r*4+4);
+    const row = slide(old);
+    if (row.toString() !== old.toString()) moved = true;
+    grid.splice(r*4, 4, ...row);
+  }
+  if (moved) { addTile(); render(); }
+}
+
+function moveRight() {
+  let moved = false;
+  for (let r = 0; r < 4; r++) {
+    const old = grid.slice(r*4, r*4+4);
+    const row = slide(old.reverse()).reverse();
+    if (row.toString() !== old.toString()) moved = true;
+    grid.splice(r*4, 4, ...row);
+  }
+  if (moved) { addTile(); render(); }
+}
+
+function moveUp() {
+  let moved = false;
+  for (let c = 0; c < 4; c++) {
+    let col = [];
+    for (let r = 0; r < 4; r++) col.push(grid[r*4+c]);
+    const newCol = slide(col);
+    if (newCol.toString() !== col.toString()) moved = true;
+    for (let r = 0; r < 4; r++) grid[r*4+c] = newCol[r];
+  }
+  if (moved) { addTile(); render(); }
+}
+
+function moveDown() {
+  let moved = false;
+  for (let c = 0; c < 4; c++) {
+    let col = [];
+    for (let r = 0; r < 4; r++) col.push(grid[r*4+c]);
+    const newCol = slide(col.reverse()).reverse();
+    if (newCol.toString() !== col.toString()) moved = true;
+    for (let r = 0; r < 4; r++) grid[r*4+c] = newCol[r];
+  }
+  if (moved) { addTile(); render(); }
+}
 
 let startX, startY;
 document.addEventListener("touchstart", e => {
@@ -108,44 +157,22 @@ document.addEventListener("touchend", e => {
   }
 });
 
-function moveLeft() {
-  for (let r = 0; r < 4; r++) {
-    let row = grid.slice(r * 4, r * 4 + 4).filter(v => v);
-    while (row.length < 4) row.push(null);
-    grid.splice(r * 4, 4, ...row);
-  }
-  addTile(); render();
-}
-function moveRight() {
-  for (let r = 0; r < 4; r++) {
-    let row = grid.slice(r * 4, r * 4 + 4).filter(v => v);
-    while (row.length < 4) row.unshift(null);
-    grid.splice(r * 4, 4, ...row);
-  }
-  addTile(); render();
-}
-function moveUp() {
-  for (let c = 0; c < 4; c++) {
-    let col = [];
-    for (let r = 0; r < 4; r++) col.push(grid[r * 4 + c]);
-    col = col.filter(v => v);
-    while (col.length < 4) col.push(null);
-    for (let r = 0; r < 4; r++) grid[r * 4 + c] = col[r];
-  }
-  addTile(); render();
-}
-function moveDown() {
-  for (let c = 0; c < 4; c++) {
-    let col = [];
-    for (let r = 0; r < 4; r++) col.push(grid[r * 4 + c]);
-    col = col.filter(v => v);
-    while (col.length < 4) col.unshift(null);
-    for (let r = 0; r < 4; r++) grid[r * 4 + c] = col[r];
-  }
-  addTile(); render();
-}
-
-render();
+document.getElementById("upload").addEventListener("change", e => {
+  images = [];
+  [...e.target.files].forEach(file => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      images.push(ev.target.result);
+      images.sort(() => Math.random() - 0.5);
+      if (images.length === 1) {
+        grid = Array(16).fill(null);
+        addTile(); addTile();
+        render();
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+});
 </script>
 </body>
 </html>
